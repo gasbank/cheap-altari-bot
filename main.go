@@ -51,9 +51,15 @@ func main() {
 				stockId = "036570"
 			} else if words[0] == "/a" {
 				stockId = "027360"
+			} else if words[0] == "/s" && len(words) > 1 {
+				stockId = words[1]
 			}
 
-			text := getStockPriceText(stockId)
+			text, err := getStockPriceText(stockId)
+
+			if err != nil || text == "" {
+				text = "오류"
+			}
 
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
 			//msg.ReplyToMessageID = update.Message.MessageID
@@ -63,7 +69,7 @@ func main() {
 	}
 }
 
-func getStockPriceText(stockId string) string {
+func getStockPriceText(stockId string) (string, error) {
 	// GET 호출
 	resp, err := http.Get(fmt.Sprintf("https://m.stock.naver.com/api/stock/%s/basic", stockId))
 	if err != nil {
@@ -77,12 +83,29 @@ func getStockPriceText(stockId string) string {
 	}
 	fmt.Printf("%s\n", string(data))
 	var basic Basic
-	json.Unmarshal(data, &basic)
+	if err := json.Unmarshal(data, &basic); err != nil {
+		return "", err
+	}
+
 	closePrice, err := strconv.Atoi(strings.ReplaceAll(basic.ClosePrice, ",", ""))
+	if err != nil {
+		return "", err
+	}
+
 	compareToPreviousClosePrice, err := strconv.Atoi(strings.ReplaceAll(basic.CompareToPreviousClosePrice, ",", ""))
+	if err != nil {
+		return "", err
+	}
+
+	if closePrice == 0 || compareToPreviousClosePrice == 0 {
+		return "", nil
+	}
+
 	prevClosePrice := closePrice - compareToPreviousClosePrice
 	percent := float64(compareToPreviousClosePrice) / float64(prevClosePrice) * 100
+
 	fmt.Println(basic.ClosePrice)
+
 	var percentIcon string
 	if percent > 0 {
 		percentIcon = "🔺"
@@ -92,5 +115,5 @@ func getStockPriceText(stockId string) string {
 		percentIcon = ""
 	}
 	text := fmt.Sprintf("%s\n현재가: %s\n전일비: %s%s (%.2f%%)", basic.StockName, basic.ClosePrice, percentIcon, basic.CompareToPreviousClosePrice, percent)
-	return text
+	return text, nil
 }
