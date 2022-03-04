@@ -1,25 +1,28 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/google/go-github/v38/github"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/google/go-github/v38/github"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 type Basic struct {
-	ItemCode string `json:"itemCode"`
-	StockName string `json:"stockName"`
-	ClosePrice string `json:"closePrice"`
+	ItemCode                    string `json:"itemCode"`
+	StockName                   string `json:"stockName"`
+	ClosePrice                  string `json:"closePrice"`
 	CompareToPreviousClosePrice string `json:"CompareToPreviousClosePrice"`
 }
 
@@ -28,11 +31,11 @@ type Majors struct {
 }
 
 type HomeMajor struct {
-	ItemCode string `json:"itemCode"`
-	Name string `json:"name"`
-	ClosePrice string `json:"closePrice"`
+	ItemCode                    string `json:"itemCode"`
+	Name                        string `json:"name"`
+	ClosePrice                  string `json:"closePrice"`
 	CompareToPreviousClosePrice string `json:"CompareToPreviousClosePrice"`
-	FluctuationRatio string `json:"fluctuationRatio"`
+	FluctuationRatio            string `json:"fluctuationRatio"`
 }
 
 type StockItem interface {
@@ -166,13 +169,13 @@ func main() {
 			log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
 			words := strings.Fields(update.Message.Text)
-			
+
 			if len(words) <= 0 {
 				continue
 			}
-			
+
 			stockId := ""
-			
+
 			if words[0] == "/k" {
 				stockId = "259960"
 			} else if words[0] == "/n" {
@@ -187,13 +190,47 @@ func main() {
 				stockId = "SPY"
 			}
 
-			text, err := getStockPriceText(stockId)
+			if stockId != "" {
+				text, err := getStockPriceText(stockId)
+				//msg.ReplyToMessageID = update.Message.MessageID
+				if err != nil {
+					text = "오류"
+				}
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+				_, _ = bot.Send(msg)
 
-			if err != nil || text == "" {
-				text = "오류"
+				continue
 			}
 
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+			imageId := ""
+
+			if words[0] == "/ggul" {
+				imageId = "ggul_bird.png"
+			} else if words[0] == "/palggul" {
+				imageId = "parggul.jpg"
+			} else if words[0] == "/salggul" {
+				imageId = "salggul.png"
+			} else if words[0] == "/racoon" {
+				imageId = "racoon.jpg"
+			} else if words[0] == "/racoon" {
+				imageId = "racoon.jpg"
+			}
+
+			if imageId != "" {
+				ibytes := &bytes.Buffer{}
+
+				file := tgbotapi.FileBytes{
+					Name:  filepath.Join("./images", imageId),
+					Bytes: ibytes.Bytes(),
+				}
+
+				photo := tgbotapi.NewPhoto(update.Message.Chat.ID, file)
+				bot.Send(photo)
+
+				continue
+			}
+
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "오류")
 			//msg.ReplyToMessageID = update.Message.MessageID
 
 			_, _ = bot.Send(msg)
