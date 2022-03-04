@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/google/go-github/v38/github"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"io/ioutil"
@@ -78,7 +79,7 @@ func (b Majors) Price() float64 {
 	if err != nil {
 		return 0
 	}
-	return float64(price)
+	return price
 }
 
 func (b Majors) Name() string {
@@ -90,7 +91,7 @@ func (b Majors) CompareToPreviousPrice() float64 {
 	if err != nil {
 		return 0
 	}
-	return float64(compareToPreviousClosePrice)
+	return compareToPreviousClosePrice
 }
 
 // ---------------------------------------
@@ -124,7 +125,28 @@ func getStockItemText(s StockItem, frac bool) string {
 	}
 }
 
+func handleGitHubPush() {
+	http.HandleFunc("/onGitHubPush", handleOnGitHubPush)
+	if os.Getenv("CHEAP_ALTARI_BOT_SERVER_DEV") == "1" {
+		addr := ":21092"
+		log.Println(fmt.Sprintf("개발 서버네요!!! HTTP addr=%s", addr))
+		if err := http.ListenAndServe(addr, nil); err != nil {
+			panic(err)
+		}
+	} else {
+		addr := ":21093"
+		log.Println(fmt.Sprintf("실서비스 서버네요!!! HTTPS addr=%s", addr))
+		certFilePath := os.Args[1]
+		keyFilePath := os.Args[2]
+		if err := http.ListenAndServeTLS(addr, certFilePath, keyFilePath, nil); err != nil {
+			panic(err)
+		}
+	}
+}
+
 func main() {
+	go handleGitHubPush()
+
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("CHEAP_ALTARI_BOT_TOKEN"))
 	if err != nil {
 		log.Panic(err)
@@ -219,4 +241,18 @@ func getStockPriceText(stockId string) (string, error) {
 	}
 
 	return getStockItemText(stockItem, frac), nil
+}
+
+func handleOnGitHubPush(_ http.ResponseWriter, request *http.Request) {
+	log.Println("handleOnGitHubPush")
+
+	payload, err := github.ValidatePayload(request, []byte(os.Getenv("CHEAP_ALTARI_BOT_GITHUB_WEBHOOK_SECRET")))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Println(string(payload))
+	log.Println("Exit by push.")
+	os.Exit(0)
 }
