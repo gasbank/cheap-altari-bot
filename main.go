@@ -3,13 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type Basic struct {
@@ -114,6 +117,13 @@ func getStockPriceText(stockId string) (string, error) {
 	} else {
 		percentIcon = ""
 	}
-	text := fmt.Sprintf("%s\n현재가: %s\n전일비: %s%s (%.2f%%)", basic.StockName, basic.ClosePrice, percentIcon, basic.CompareToPreviousClosePrice, percent)
+
+	percent = math.Abs(percent)
+	if compareToPreviousClosePrice < 0 {
+		compareToPreviousClosePrice = -compareToPreviousClosePrice
+	}
+
+	p := message.NewPrinter(language.English)
+	text := p.Sprintf("%s\n현재가: %d\n전일비: %s%d (%.2f%%)", basic.StockName, closePrice, percentIcon, compareToPreviousClosePrice, percent)
 	return text, nil
 }
