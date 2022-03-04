@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -125,27 +126,52 @@ func getStockItemText(s StockItem, frac bool) string {
 	}
 }
 
-func handleGitHubPush() {
-	http.HandleFunc("/onGitHubPush", handleOnGitHubPush)
+var shutdownCh chan string
+
+func startGitHubPushListener() {
+	shutdownCh = make(chan string)
+
+	m := http.NewServeMux()
+	m.HandleFunc("/onGitHubPush", handleOnGitHubPush)
+
+	var server *http.Server
+
 	if os.Getenv("CHEAP_ALTARI_BOT_SERVER_DEV") == "1" {
 		addr := ":21092"
 		log.Println(fmt.Sprintf("개발 서버네요!!! HTTP addr=%s", addr))
-		if err := http.ListenAndServe(addr, nil); err != nil {
-			panic(err)
-		}
+		server = &http.Server{Addr: addr, Handler: m}
+
+		go func() {
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				panic(err)
+			}
+		}()
 	} else {
 		addr := ":21093"
 		log.Println(fmt.Sprintf("실서비스 서버네요!!! HTTPS addr=%s", addr))
-		certFilePath := os.Args[1]
-		keyFilePath := os.Args[2]
-		if err := http.ListenAndServeTLS(addr, certFilePath, keyFilePath, nil); err != nil {
-			panic(err)
-		}
+		server = &http.Server{Addr: addr, Handler: m}
+
+		go func() {
+			certFilePath := os.Args[1]
+			keyFilePath := os.Args[2]
+			if err := server.ListenAndServeTLS(certFilePath, keyFilePath); err != nil && err != http.ErrServerClosed {
+				panic(err)
+			}
+		}()
 	}
+
+	select {
+	case shutdownMsg := <-shutdownCh:
+		_ = server.Shutdown(context.Background())
+		log.Printf("Shutdown message: %s", shutdownMsg)
+	}
+
+	log.Println("Gracefully shutdown")
+	os.Exit(0)
 }
 
 func main() {
-	go handleGitHubPush()
+	go startGitHubPushListener()
 
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("CHEAP_ALTARI_BOT_TOKEN"))
 	if err != nil {
@@ -249,12 +275,14 @@ func handleOnGitHubPush(writer http.ResponseWriter, request *http.Request) {
 	payload, err := github.ValidatePayload(request, []byte(os.Getenv("CHEAP_ALTARI_BOT_GITHUB_WEBHOOK_SECRET")))
 	if err != nil {
 		log.Println(err)
-		return
+		if os.Getenv("CHEAP_ALTARI_BOT_SERVER_DEV") != "1" {
+			return
+		}
 	}
 
 	_, _ = writer.Write([]byte("ok"))
 
 	log.Println(string(payload))
 	log.Println("Exit by push.")
-	os.Exit(0)
+	shutdownCh <- "bye"
 }
