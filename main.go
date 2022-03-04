@@ -243,7 +243,7 @@ func getStockPriceText(stockId string) (string, error) {
 	return getStockItemText(stockItem, frac), nil
 }
 
-func handleOnGitHubPush(_ http.ResponseWriter, request *http.Request) {
+func handleOnGitHubPush(writer http.ResponseWriter, request *http.Request) {
 	log.Println("handleOnGitHubPush")
 
 	payload, err := github.ValidatePayload(request, []byte(os.Getenv("CHEAP_ALTARI_BOT_GITHUB_WEBHOOK_SECRET")))
@@ -251,6 +251,8 @@ func handleOnGitHubPush(_ http.ResponseWriter, request *http.Request) {
 		log.Println(err)
 		return
 	}
+
+	_, _ = writer.Write([]byte("ok"))
 
 	log.Println(string(payload))
 	log.Println("Exit by push.")
