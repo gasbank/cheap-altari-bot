@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -217,22 +216,24 @@ func main() {
 			}
 
 			if imageId != "" {
-				ibytes := &bytes.Buffer{}
+				ibytes, err := ioutil.ReadFile(filepath.Join("./images", imageId))
 
-				file := tgbotapi.FileBytes{
-					Name:  filepath.Join("./images", imageId),
-					Bytes: ibytes.Bytes(),
+				if err == nil {
+
+					file := tgbotapi.FileBytes{
+						Name:  imageId,
+						Bytes: ibytes,
+					}
+
+					photo := tgbotapi.NewPhoto(update.Message.Chat.ID, file)
+					bot.Send(photo)
+
+					continue
 				}
-
-				photo := tgbotapi.NewPhoto(update.Message.Chat.ID, file)
-				bot.Send(photo)
-
-				continue
 			}
 
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "오류")
 			//msg.ReplyToMessageID = update.Message.MessageID
-
 			_, _ = bot.Send(msg)
 		}
 	}
