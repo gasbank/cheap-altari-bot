@@ -73,12 +73,21 @@ func (b Basic) CompareToPreviousPrice() float64 {
 
 // ---------------------------------------
 
+func (b Majors) GetHomeMajor() HomeMajor {
+	for i := 0; i < len(b.HomeMajors); i++ {
+		if b.HomeMajors[i].ItemCode == "KOSPI" {
+			return b.HomeMajors[i]
+		}
+	}
+	return HomeMajor{}
+}
+
 func (b Majors) StockId() string {
-	return b.HomeMajors[0].ItemCode
+	return b.GetHomeMajor().ItemCode
 }
 
 func (b Majors) Price() float64 {
-	price, err := strconv.ParseFloat(strings.ReplaceAll(b.HomeMajors[0].ClosePrice, ",", ""), 64)
+	price, err := strconv.ParseFloat(strings.ReplaceAll(b.GetHomeMajor().ClosePrice, ",", ""), 64)
 	if err != nil {
 		return 0
 	}
@@ -86,11 +95,11 @@ func (b Majors) Price() float64 {
 }
 
 func (b Majors) Name() string {
-	return b.HomeMajors[0].Name
+	return b.GetHomeMajor().Name
 }
 
 func (b Majors) CompareToPreviousPrice() float64 {
-	compareToPreviousClosePrice, err := strconv.ParseFloat(strings.ReplaceAll(b.HomeMajors[0].CompareToPreviousClosePrice, ",", ""), 64)
+	compareToPreviousClosePrice, err := strconv.ParseFloat(strings.ReplaceAll(b.GetHomeMajor().CompareToPreviousClosePrice, ",", ""), 64)
 	if err != nil {
 		return 0
 	}
