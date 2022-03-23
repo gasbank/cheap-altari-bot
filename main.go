@@ -218,6 +218,8 @@ func main() {
 				stockId = "036570"
 			} else if words[0] == "/a" {
 				stockId = "027360"
+			} else if words[0] == "/skh" {
+				stockId = "000660"
 			} else if words[0] == "/s" && len(words) > 1 {
 				stockId = words[1]
 			} else if words[0] == "/kospi" {
