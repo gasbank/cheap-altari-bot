@@ -213,18 +213,28 @@ func main() {
 			stockId := ""
 
 			if words[0] == "/k" {
+				// 크래프톤
 				stockId = "259960"
 			} else if words[0] == "/n" {
+				// 엔씨소프트
 				stockId = "036570"
 			} else if words[0] == "/a" {
+				// 아주IB투자
 				stockId = "027360"
 			} else if words[0] == "/skh" {
+				// SK하이닉스
 				stockId = "000660"
+			} else if words[0] == "/energy" {
+				// KODEX K-신재생에너지액티브
+				stockId = "385510"
 			} else if words[0] == "/s" && len(words) > 1 {
+				// 종목 직접 지정 ('/s 259960')
 				stockId = words[1]
 			} else if words[0] == "/kospi" {
+				// 코스피
 				stockId = "kospi"
 			} else if words[0] == "/spy" {
+				// SPDR S&P 500 ETF Trust
 				stockId = "SPY"
 			}
 
