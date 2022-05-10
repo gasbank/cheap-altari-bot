@@ -210,6 +210,21 @@ func main() {
 				continue
 			}
 
+			if words[0] == "/kdream" {
+				dreamStockItem := Basic{
+					ItemCode:                    "259960",
+					StockName:                   "크래프톤",
+					ClosePrice:                  "1000000",
+					CompareToPreviousClosePrice: "770000",
+				}
+
+				text := getStockItemText(dreamStockItem, false)
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+				_, _ = bot.Send(msg)
+
+				continue
+			}
+
 			stockId := ""
 
 			if words[0] == "/k" {
