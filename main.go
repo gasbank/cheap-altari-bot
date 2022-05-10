@@ -219,7 +219,7 @@ func main() {
 				}
 
 				text := getStockItemText(dreamStockItem, false)
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "`" + text + "`")
 				_, _ = bot.Send(msg)
 
 				continue
