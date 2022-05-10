@@ -215,7 +215,7 @@ func main() {
 					ItemCode:                    "259960",
 					StockName:                   "크래프톤",
 					ClosePrice:                  "1000000",
-					CompareToPreviousClosePrice: "770000",
+					CompareToPreviousClosePrice: "230000",
 				}
 
 				text := getStockItemText(dreamStockItem, false)
