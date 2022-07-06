@@ -242,6 +242,9 @@ func main() {
 			} else if words[0] == "/energy" {
 				// KODEX K-신재생에너지액티브
 				stockId = "385510"
+			} else if words[0] == "/kg" {
+				// 카카오게임즈
+				stockId = "293490"
 			} else if words[0] == "/s" && len(words) > 1 {
 				// 종목 직접 지정 ('/s 259960')
 				stockId = words[1]
