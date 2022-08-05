@@ -245,6 +245,9 @@ func main() {
 			} else if words[0] == "/kg" {
 				// 카카오게임즈
 				stockId = "293490"
+			} else if words[0] == "/lgd" {
+				// LG디스플레이
+				stockId = "034220"
 			} else if words[0] == "/s" && len(words) > 1 {
 				// 종목 직접 지정 ('/s 259960')
 				stockId = words[1]
