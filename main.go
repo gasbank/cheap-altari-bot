@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 	"io/ioutil"
 	"log"
 	"math"
@@ -18,6 +20,14 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
+
+type InvestingJson struct {
+	Html InvestingHtml `json:"html"`
+}
+
+type InvestingHtml struct {
+	ChartInfo string `json:"chart_info"`
+}
 
 type Basic struct {
 	ItemCode                    string `json:"itemCode"`
@@ -182,6 +192,12 @@ func startGitHubPushListener() {
 }
 
 func main() {
+	/*
+		a, b := getStockPriceTextFromInvesting("QQQ")
+		log.Println(a)
+		log.Println(b)
+	*/
+
 	go startGitHubPushListener()
 
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("CHEAP_ALTARI_BOT_TOKEN"))
@@ -257,10 +273,13 @@ func main() {
 			} else if words[0] == "/spy" {
 				// SPDR S&P 500 ETF Trust
 				stockId = "SPY"
+			} else if words[0] == "/qqq" {
+				// Invesco QQQ Trust
+				stockId = "QQQ"
 			}
 
 			if stockId != "" {
-				text, err := getStockPriceText(stockId)
+				text, err := getStockPriceTextFromInvesting(stockId)
 				//msg.ReplyToMessageID = update.Message.MessageID
 				if err != nil {
 					text = "오류"
@@ -349,6 +368,83 @@ func getStockPriceText(stockId string) (string, error) {
 	}
 
 	return getStockItemText(stockItem, frac), nil
+}
+
+func findTextDataBySpanIdAnchors(node *html.Node, spanId string) string {
+	for c := node.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode {
+			if c.DataAtom == atom.Span {
+				for _, v := range c.Attr {
+					if v.Key == "id" && v.Val == spanId {
+						for cc := c.FirstChild; cc != nil; cc = cc.NextSibling {
+							if cc.Type == html.TextNode {
+								return cc.Data
+							}
+						}
+					}
+				}
+			}
+		}
+
+		childRet := findTextDataBySpanIdAnchors(c, spanId)
+		if childRet != "" {
+			return childRet
+		}
+	}
+
+	return ""
+}
+
+func getStockPriceTextFromInvesting(stockId string) (string, error) {
+	var getUrl string
+	var frac bool
+	if stockId == "QQQ" {
+		getUrl = "https://jp.investing.com/common/modules/js_instrument_chart/api/data.php?pair_id=651&pair_id_for_news=651&chart_type=area&pair_interval=86400&candle_count=120&events=yes&volume_series=yes"
+		frac = true
+	} else {
+		// 나머지는 다 네이버 파이낸셜로...
+		return getStockPriceText(stockId)
+	}
+
+	req, _ := http.NewRequest("GET", getUrl, nil)
+	req.Header.Set("referer", "https://jp.investing.com/etfs/powershares-qqqq")
+	req.Header.Set("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36")
+	req.Header.Set("x-requested-with", "XMLHttpRequest")
+
+	client := new(http.Client)
+	resp, err := client.Do(req)
+
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	// 결과 출력
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%s\n", string(data))
+
+	var investingJson InvestingJson
+	if err := json.Unmarshal(data, &investingJson); err == nil {
+		node, err := html.Parse(strings.NewReader(investingJson.Html.ChartInfo))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		basic := Basic{
+			StockName:                   findTextDataBySpanIdAnchors(node, "chart-info-symbol"),
+			ClosePrice:                  findTextDataBySpanIdAnchors(node, "chart-info-last"),
+			CompareToPreviousClosePrice: findTextDataBySpanIdAnchors(node, "chart-info-change"),
+		}
+
+		return getStockItemText(basic, frac), nil
+	} else {
+		return "", err
+	}
+
+	return "", nil
 }
 
 func handleOnGitHubPush(writer http.ResponseWriter, request *http.Request) {
