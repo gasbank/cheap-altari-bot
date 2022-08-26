@@ -193,11 +193,10 @@ func startGitHubPushListener() {
 
 func main() {
 	/*
-		a, b := getStockPriceTextFromInvesting("QQQ")
+		a, b := getStockPriceTextFromInvesting("BOTZ")
 		log.Println(a)
 		log.Println(b)
 	*/
-
 	go startGitHubPushListener()
 
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("CHEAP_ALTARI_BOT_TOKEN"))
@@ -276,6 +275,9 @@ func main() {
 			} else if words[0] == "/qqq" {
 				// Invesco QQQ Trust
 				stockId = "QQQ"
+			} else if words[0] == "/botz" {
+				// Invesco QQQ Trust
+				stockId = "BOTZ"
 			}
 
 			if stockId != "" {
@@ -398,8 +400,14 @@ func findTextDataBySpanIdAnchors(node *html.Node, spanId string) string {
 func getStockPriceTextFromInvesting(stockId string) (string, error) {
 	var getUrl string
 	var frac bool
+	var referer string
 	if stockId == "QQQ" {
 		getUrl = "https://jp.investing.com/common/modules/js_instrument_chart/api/data.php?pair_id=651&pair_id_for_news=651&chart_type=area&pair_interval=86400&candle_count=120&events=yes&volume_series=yes"
+		referer = "https://jp.investing.com/etfs/powershares-qqqq"
+		frac = true
+	} else if stockId == "BOTZ" {
+		getUrl = "https://jp.investing.com/common/modules/js_instrument_chart/api/data.php?pair_id=995739&pair_id_for_news=995739&chart_type=area&pair_interval=86400&candle_count=120&events=yes&volume_series=yes"
+		referer = "https://jp.investing.com/etfs/global-x-robotics---ai-usd"
 		frac = true
 	} else {
 		// 나머지는 다 네이버 파이낸셜로...
@@ -407,7 +415,7 @@ func getStockPriceTextFromInvesting(stockId string) (string, error) {
 	}
 
 	req, _ := http.NewRequest("GET", getUrl, nil)
-	req.Header.Set("referer", "https://jp.investing.com/etfs/powershares-qqqq")
+	req.Header.Set("referer", referer)
 	req.Header.Set("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36")
 	req.Header.Set("x-requested-with", "XMLHttpRequest")
 
