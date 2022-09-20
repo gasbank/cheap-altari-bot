@@ -250,6 +250,7 @@ func main() {
 		var update tgbotapi.Update
 		if err := json.Unmarshal([]byte(msg.Payload), &update); err != nil {
 			log.Print(err)
+			log.Printf("Provided JSON:%v", msg.Payload)
 			continue
 		}
 
