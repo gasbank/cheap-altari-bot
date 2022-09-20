@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 	"golang.org/x/text/message"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
@@ -25,6 +27,24 @@ import (
 
 var rdbContext = context.Background()
 var rdb *redis.Client
+
+type YahooFinanceJson struct {
+	Chart YahooFinanceChart `json:"chart"`
+}
+
+type YahooFinanceChart struct {
+	Result []YahooFinanceResult `json:"result"`
+}
+
+type YahooFinanceResult struct {
+	Meta YahooFinanceMeta `json:"meta"`
+}
+
+type YahooFinanceMeta struct {
+	Symbol             string  `json:"symbol"`
+	RegularMarketPrice float32 `json:"regularMarketPrice"`
+	ChartPreviousClose float32 `json:"chartPreviousClose"`
+}
 
 type InvestingJson struct {
 	Html InvestingHtml `json:"html"`
@@ -233,10 +253,10 @@ func main() {
 	//subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
 
 	/*
-	updates := bot.GetUpdatesChan(u)
-	for update := range updates {
-		handleUpdate(bot, update)
-	}
+		updates := bot.GetUpdatesChan(u)
+		for update := range updates {
+			handleUpdate(bot, update)
+		}
 	*/
 
 	subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
@@ -325,7 +345,7 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 		}
 
 		if stockId != "" {
-			text, err := getStockPriceTextFromInvesting(stockId)
+			text, err := getStockPriceTextFromYahoo(stockId)
 			//msg.ReplyToMessageID = update.Message.MessageID
 			if err != nil {
 				text = "오류"
@@ -440,6 +460,64 @@ func findTextDataBySpanIdAnchors(node *html.Node, spanId string) string {
 	return ""
 }
 
+func getStockPriceTextFromYahoo(stockId string) (string, error) {
+	var getUrl string
+	var frac bool
+	if stockId == "QQQ" {
+		getUrl = "https://query1.finance.yahoo.com/v8/finance/chart/QQQ?interval=3mo"
+		frac = true
+	} else if stockId == "BOTZ" {
+		getUrl = "https://query1.finance.yahoo.com/v8/finance/chart/BOTZ?interval=3mo"
+		frac = true
+	} else {
+		// 나머지는 다 네이버 파이낸셜로...
+		return getStockPriceText(stockId)
+	}
+
+	req, _ := http.NewRequest("GET", getUrl, nil)
+
+	client := new(http.Client)
+	resp, err := client.Do(req)
+
+	if err != nil {
+		panic(err)
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	// 결과 출력
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%s\n", string(data))
+
+	var yahooFinanceJson YahooFinanceJson
+	if err := json.Unmarshal(data, &yahooFinanceJson); err == nil {
+
+		if len(yahooFinanceJson.Chart.Result) == 0 {
+			return "", errors.New("empty array")
+		}
+
+		result := yahooFinanceJson.Chart.Result[0]
+
+		basic := Basic{
+			StockName:                   result.Meta.Symbol,
+			ClosePrice:                  fmt.Sprintf("%.2f", result.Meta.RegularMarketPrice),
+			CompareToPreviousClosePrice: fmt.Sprintf("%.2f", result.Meta.RegularMarketPrice - result.Meta.ChartPreviousClose),
+		}
+
+		return getStockItemText(basic, frac), nil
+	} else {
+		return "", err
+	}
+
+	return "", nil
+}
+
+// 며칠 쓰니까 무슨 방식인지 보안 절차가 추가되었다.
+// URL 바뀌는 방식으로 보이므로... 쓰지 않도록
 func getStockPriceTextFromInvesting(stockId string) (string, error) {
 	var getUrl string
 	var frac bool
