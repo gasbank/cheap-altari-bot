@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
+	"golang.org/x/text/message"
 	"io/ioutil"
 	"log"
 	"math"
@@ -15,11 +16,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-redis/redis/v8"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/go-github/v38/github"
+	"github.com/joho/godotenv"
 	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 )
+
+var rdbContext = context.Background()
+var rdb *redis.Client
 
 type InvestingJson struct {
 	Html InvestingHtml `json:"html"`
@@ -192,6 +197,12 @@ func startGitHubPushListener() {
 }
 
 func main() {
+	log.Println("cheap-altari-bot: load .env file")
+	err := godotenv.Load(".env")
+	if err != nil {
+		panic(err)
+	}
+
 	/*
 		a, b := getStockPriceTextFromInvesting("BOTZ")
 		log.Println(a)
@@ -208,125 +219,153 @@ func main() {
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
-	bot.Request(tgbotapi.DeleteWebhookConfig{})
+	//bot.Request(tgbotapi.DeleteWebhookConfig{})
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
+	rdb = redis.NewClient(&redis.Options{
+		Addr:     "",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+
+	//subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
+
+	/*
 	updates := bot.GetUpdatesChan(u)
-
 	for update := range updates {
-		if update.Message != nil && update.Message.ReplyToMessage == nil { // If we got a message
-			log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
+		handleUpdate(bot, update)
+	}
+	*/
 
-			words := strings.Fields(update.Message.Text)
-
-			if len(words) <= 0 {
-				continue
-			}
-
-			if words[0] == "/kdream" {
-				dreamStockItem := Basic{
-					ItemCode:                    "259960",
-					StockName:                   "크래프톤",
-					ClosePrice:                  "1000000",
-					CompareToPreviousClosePrice: "230000",
-				}
-
-				text := getStockItemText(dreamStockItem, false)
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
-				_, _ = bot.Send(msg)
-
-				continue
-			}
-
-			stockId := ""
-
-			if words[0] == "/k" {
-				// 크래프톤
-				stockId = "259960"
-			} else if words[0] == "/n" {
-				// 엔씨소프트
-				stockId = "036570"
-			} else if words[0] == "/a" {
-				// 아주IB투자
-				stockId = "027360"
-			} else if words[0] == "/skh" {
-				// SK하이닉스
-				stockId = "000660"
-			} else if words[0] == "/energy" {
-				// KODEX K-신재생에너지액티브
-				stockId = "385510"
-			} else if words[0] == "/kg" {
-				// 카카오게임즈
-				stockId = "293490"
-			} else if words[0] == "/lgd" {
-				// LG디스플레이
-				stockId = "034220"
-			} else if words[0] == "/s" && len(words) > 1 {
-				// 종목 직접 지정 ('/s 259960')
-				stockId = words[1]
-			} else if words[0] == "/kospi" {
-				// 코스피
-				stockId = "kospi"
-			} else if words[0] == "/spy" {
-				// SPDR S&P 500 ETF Trust
-				stockId = "SPY"
-			} else if words[0] == "/qqq" {
-				// Invesco QQQ Trust
-				stockId = "QQQ"
-			} else if words[0] == "/botz" {
-				// Invesco QQQ Trust
-				stockId = "BOTZ"
-			}
-
-			if stockId != "" {
-				text, err := getStockPriceTextFromInvesting(stockId)
-				//msg.ReplyToMessageID = update.Message.MessageID
-				if err != nil {
-					text = "오류"
-				}
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
-				_, _ = bot.Send(msg)
-
-				continue
-			}
-
-			imageId := ""
-
-			if words[0] == "/ggul" {
-				imageId = "ggul_bird.png"
-			} else if words[0] == "/palggul" {
-				imageId = "parggul.jpg"
-			} else if words[0] == "/salggul" {
-				imageId = "salggul.png"
-			} else if words[0] == "/racoon" {
-				imageId = "racoon.jpg"
-			} else if words[0] == "/racoon" {
-				imageId = "racoon.jpg"
-			}
-
-			if imageId != "" {
-				ibytes, err := ioutil.ReadFile(filepath.Join("./images", imageId))
-
-				if err == nil {
-
-					file := tgbotapi.FileBytes{
-						Name:  imageId,
-						Bytes: ibytes,
-					}
-
-					photo := tgbotapi.NewPhoto(update.Message.Chat.ID, file)
-					bot.Send(photo)
-
-					continue
-				}
-			}
-
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "오류")
-			//msg.ReplyToMessageID = update.Message.MessageID
-			_, _ = bot.Send(msg)
+	subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
+	for {
+		msg, err := subscriber.ReceiveMessage(rdbContext)
+		if err != nil {
+			continue
 		}
+
+		var update tgbotapi.Update
+		if err := json.Unmarshal([]byte(msg.Payload), &update); err != nil {
+			continue
+		}
+
+		handleUpdate(bot, update)
+	}
+}
+
+func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
+	if update.Message != nil && update.Message.ReplyToMessage == nil { // If we got a message
+		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
+
+		words := strings.Fields(update.Message.Text)
+
+		if len(words) <= 0 {
+			return
+		}
+
+		if words[0] == "/kdream" {
+			dreamStockItem := Basic{
+				ItemCode:                    "259960",
+				StockName:                   "크래프톤",
+				ClosePrice:                  "1000000",
+				CompareToPreviousClosePrice: "230000",
+			}
+
+			text := getStockItemText(dreamStockItem, false)
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+			_, _ = bot.Send(msg)
+
+			return
+		}
+
+		stockId := ""
+
+		if words[0] == "/k" {
+			// 크래프톤
+			stockId = "259960"
+		} else if words[0] == "/n" {
+			// 엔씨소프트
+			stockId = "036570"
+		} else if words[0] == "/a" {
+			// 아주IB투자
+			stockId = "027360"
+		} else if words[0] == "/skh" {
+			// SK하이닉스
+			stockId = "000660"
+		} else if words[0] == "/energy" {
+			// KODEX K-신재생에너지액티브
+			stockId = "385510"
+		} else if words[0] == "/kg" {
+			// 카카오게임즈
+			stockId = "293490"
+		} else if words[0] == "/lgd" {
+			// LG디스플레이
+			stockId = "034220"
+		} else if words[0] == "/s" && len(words) > 1 {
+			// 종목 직접 지정 ('/s 259960')
+			stockId = words[1]
+		} else if words[0] == "/kospi" {
+			// 코스피
+			stockId = "kospi"
+		} else if words[0] == "/spy" {
+			// SPDR S&P 500 ETF Trust
+			stockId = "SPY"
+		} else if words[0] == "/qqq" {
+			// Invesco QQQ Trust
+			stockId = "QQQ"
+		} else if words[0] == "/botz" {
+			// Invesco QQQ Trust
+			stockId = "BOTZ"
+		}
+
+		if stockId != "" {
+			text, err := getStockPriceTextFromInvesting(stockId)
+			//msg.ReplyToMessageID = update.Message.MessageID
+			if err != nil {
+				text = "오류"
+			}
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+			_, _ = bot.Send(msg)
+
+			return
+		}
+
+		imageId := ""
+
+		if words[0] == "/ggul" {
+			imageId = "ggul_bird.png"
+		} else if words[0] == "/palggul" {
+			imageId = "parggul.jpg"
+		} else if words[0] == "/salggul" {
+			imageId = "salggul.png"
+		} else if words[0] == "/racoon" {
+			imageId = "racoon.jpg"
+		} else if words[0] == "/racoon" {
+			imageId = "racoon.jpg"
+		}
+
+		if imageId != "" {
+			ibytes, err := ioutil.ReadFile(filepath.Join("./images", imageId))
+
+			if err == nil {
+
+				file := tgbotapi.FileBytes{
+					Name:  imageId,
+					Bytes: ibytes,
+				}
+
+				photo := tgbotapi.NewPhoto(update.Message.Chat.ID, file)
+				bot.Send(photo)
+
+				return
+			}
+		}
+
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "오류")
+		//msg.ReplyToMessageID = update.Message.MessageID
+		_, _ = bot.Send(msg)
 	}
 }
 
