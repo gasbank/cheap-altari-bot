@@ -243,15 +243,18 @@ func main() {
 	for {
 		msg, err := subscriber.ReceiveMessage(rdbContext)
 		if err != nil {
+			log.Print(err)
 			continue
 		}
 
 		var update tgbotapi.Update
 		if err := json.Unmarshal([]byte(msg.Payload), &update); err != nil {
+			log.Print(err)
 			continue
 		}
 
 		handleUpdate(bot, update)
+		log.Println("Good")
 	}
 }
 
