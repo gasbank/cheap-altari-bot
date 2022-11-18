@@ -252,13 +252,13 @@ func main() {
 
 	//subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
 
+	
+	updates := bot.GetUpdatesChan(u)
+	for update := range updates {
+		handleUpdate(bot, update)
+	}
+	
 	/*
-		updates := bot.GetUpdatesChan(u)
-		for update := range updates {
-			handleUpdate(bot, update)
-		}
-	*/
-
 	subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
 	for {
 		msg, err := subscriber.ReceiveMessage(rdbContext)
@@ -277,6 +277,7 @@ func main() {
 		handleUpdate(bot, update)
 		log.Println("Good")
 	}
+	*/
 }
 
 func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
