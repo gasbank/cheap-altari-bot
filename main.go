@@ -305,59 +305,74 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 			return
 		}
 
-		stockId := ""
+		var stockId []string
 
 		if words[0] == "/k" {
 			// 크래프톤
-			stockId = "259960"
+			stockId = append(stockId, "259960")
 		} else if words[0] == "/n" {
 			// 엔씨소프트
-			stockId = "036570"
+			stockId = append(stockId, "036570")
 		} else if words[0] == "/a" {
 			// 아주IB투자
-			stockId = "027360"
+			stockId = append(stockId, "027360")
 		} else if words[0] == "/skh" {
 			// SK하이닉스
-			stockId = "000660"
+			stockId = append(stockId, "000660")
 		} else if words[0] == "/energy" {
 			// KODEX K-신재생에너지액티브
-			stockId = "385510"
+			stockId = append(stockId, "385510")
 		} else if words[0] == "/kg" {
 			// 카카오게임즈
-			stockId = "293490"
+			stockId = append(stockId, "293490")
 		} else if words[0] == "/lgd" {
 			// LG디스플레이
-			stockId = "034220"
+			stockId = append(stockId, "034220")
 		} else if words[0] == "/p" {
 			// 펄어비스
-			stockId = "263750"
+			stockId = append(stockId, "263750")
 		} else if words[0] == "/c" {
 			// 컴투스
-			stockId = "078340"
+			stockId = append(stockId, "078340")
+		} else if words[0] == "/N" {
+			// 엔씨소프트
+			stockId = append(stockId, "036570")
+			// 넷마블
+			stockId = append(stockId, "251270")
+			// 네오위즈
+			stockId = append(stockId, "095660")
 		} else if words[0] == "/s" && len(words) > 1 {
 			// 종목 직접 지정 ('/s 259960')
-			stockId = words[1]
+			stockId = append(stockId, words[1])
 		} else if words[0] == "/kospi" {
 			// 코스피
-			stockId = "kospi"
+			stockId = append(stockId, "kospi")
 		} else if words[0] == "/spy" {
 			// SPDR S&P 500 ETF Trust
-			stockId = "SPY"
+			stockId = append(stockId, "SPY")
 		} else if words[0] == "/qqq" {
 			// Invesco QQQ Trust
-			stockId = "QQQ"
+			stockId = append(stockId, "QQQ")
 		} else if words[0] == "/botz" {
 			// Invesco QQQ Trust
-			stockId = "BOTZ"
+			stockId = append(stockId, "BOTZ")
 		}
 
-		if stockId != "" {
-			text, err := getStockPriceTextFromYahoo(stockId)
-			//msg.ReplyToMessageID = update.Message.MessageID
-			if err != nil {
-				text = "오류"
+		if len(stockId) > 0 {
+
+			var textAppended string
+			for _, sId := range stockId {
+
+				text, err := getStockPriceTextFromYahoo(sId)
+				//msg.ReplyToMessageID = update.Message.MessageID
+				if err != nil {
+					text = "오류"
+				}
+
+				textAppended = textAppended + text + "\n"
 			}
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, textAppended)
 			_, _ = bot.Send(msg)
 
 			return
