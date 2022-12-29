@@ -253,12 +253,12 @@ func main() {
 	//subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
 
 	
-	updates := bot.GetUpdatesChan(u)
-	for update := range updates {
-		handleUpdate(bot, update)
-	}
-	
+		updates := bot.GetUpdatesChan(u)
+		for update := range updates {
+			handleUpdate(bot, update)
+		}
 	/*
+
 	subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
 	for {
 		msg, err := subscriber.ReceiveMessage(rdbContext)
@@ -328,6 +328,9 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 		} else if words[0] == "/lgd" {
 			// LG디스플레이
 			stockId = "034220"
+		} else if words[0] == "/p" {
+			// 펄어비스
+			stockId = "263750"
 		} else if words[0] == "/s" && len(words) > 1 {
 			// 종목 직접 지정 ('/s 259960')
 			stockId = words[1]
