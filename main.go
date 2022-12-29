@@ -331,6 +331,9 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 		} else if words[0] == "/p" {
 			// 펄어비스
 			stockId = "263750"
+		} else if words[0] == "/c" {
+			// 컴투스
+			stockId = "078340"
 		} else if words[0] == "/s" && len(words) > 1 {
 			// 종목 직접 지정 ('/s 259960')
 			stockId = words[1]
