@@ -166,9 +166,9 @@ func getStockItemText(s StockItem, frac bool) string {
 
 	p := message.NewPrinter(language.English)
 	if frac == false {
-		return p.Sprintf("*%s*\n현재가: %.0f\n전일비: %s%.0f (%.2f%%)", s.Name(), closePrice, percentIcon, compareToPreviousClosePrice, percent)
+		return p.Sprintf("*%s*\n현재가: %.0f\n전일비: %s%.0f \\(%.2f%%\\)", s.Name(), closePrice, percentIcon, compareToPreviousClosePrice, percent)
 	} else {
-		return p.Sprintf("*%s*\n현재가: %.2f\n전일비: %s%.2f (%.2f%%)", s.Name(), closePrice, percentIcon, compareToPreviousClosePrice, percent)
+		return p.Sprintf("*%s*\n현재가: %.2f\n전일비: %s%.2f \\(%.2f%%\\)", s.Name(), closePrice, percentIcon, compareToPreviousClosePrice, percent)
 	}
 }
 
