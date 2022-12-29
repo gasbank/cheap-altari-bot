@@ -166,9 +166,9 @@ func getStockItemText(s StockItem, frac bool) string {
 
 	p := message.NewPrinter(language.English)
 	if frac == false {
-		return p.Sprintf("%s\n현재가: %.0f\n전일비: %s%.0f (%.2f%%)", s.Name(), closePrice, percentIcon, compareToPreviousClosePrice, percent)
+		return p.Sprintf("*%s*\n현재가: %.0f\n전일비: %s%.0f (%.2f%%)", s.Name(), closePrice, percentIcon, compareToPreviousClosePrice, percent)
 	} else {
-		return p.Sprintf("%s\n현재가: %.2f\n전일비: %s%.2f (%.2f%%)", s.Name(), closePrice, percentIcon, compareToPreviousClosePrice, percent)
+		return p.Sprintf("*%s*\n현재가: %.2f\n전일비: %s%.2f (%.2f%%)", s.Name(), closePrice, percentIcon, compareToPreviousClosePrice, percent)
 	}
 }
 
@@ -252,31 +252,30 @@ func main() {
 
 	//subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
 
-	
-		updates := bot.GetUpdatesChan(u)
-		for update := range updates {
-			handleUpdate(bot, update)
-		}
+	updates := bot.GetUpdatesChan(u)
+	for update := range updates {
+		handleUpdate(bot, update)
+	}
 	/*
 
-	subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
-	for {
-		msg, err := subscriber.ReceiveMessage(rdbContext)
-		if err != nil {
-			log.Print(err)
-			continue
-		}
+		subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
+		for {
+			msg, err := subscriber.ReceiveMessage(rdbContext)
+			if err != nil {
+				log.Print(err)
+				continue
+			}
 
-		var update tgbotapi.Update
-		if err := json.Unmarshal([]byte(msg.Payload), &update); err != nil {
-			log.Print(err)
-			log.Printf("Provided JSON:%v", msg.Payload)
-			continue
-		}
+			var update tgbotapi.Update
+			if err := json.Unmarshal([]byte(msg.Payload), &update); err != nil {
+				log.Print(err)
+				log.Printf("Provided JSON:%v", msg.Payload)
+				continue
+			}
 
-		handleUpdate(bot, update)
-		log.Println("Good")
-	}
+			handleUpdate(bot, update)
+			log.Println("Good")
+		}
 	*/
 }
 
@@ -299,71 +298,71 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 			}
 
 			text := getStockItemText(dreamStockItem, false)
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+			msg := newMessage(update.Message.Chat.ID, text)
 			_, _ = bot.Send(msg)
 
 			return
 		}
 
-		var stockId []string
+		var stockIdList []string
 
 		if words[0] == "/k" {
 			// 크래프톤
-			stockId = append(stockId, "259960")
+			stockIdList = append(stockIdList, "259960")
 		} else if words[0] == "/n" {
 			// 엔씨소프트
-			stockId = append(stockId, "036570")
+			stockIdList = append(stockIdList, "036570")
 		} else if words[0] == "/a" {
 			// 아주IB투자
-			stockId = append(stockId, "027360")
+			stockIdList = append(stockIdList, "027360")
 		} else if words[0] == "/skh" {
 			// SK하이닉스
-			stockId = append(stockId, "000660")
+			stockIdList = append(stockIdList, "000660")
 		} else if words[0] == "/energy" {
 			// KODEX K-신재생에너지액티브
-			stockId = append(stockId, "385510")
+			stockIdList = append(stockIdList, "385510")
 		} else if words[0] == "/kg" {
 			// 카카오게임즈
-			stockId = append(stockId, "293490")
+			stockIdList = append(stockIdList, "293490")
 		} else if words[0] == "/lgd" {
 			// LG디스플레이
-			stockId = append(stockId, "034220")
+			stockIdList = append(stockIdList, "034220")
 		} else if words[0] == "/p" {
 			// 펄어비스
-			stockId = append(stockId, "263750")
+			stockIdList = append(stockIdList, "263750")
 		} else if words[0] == "/c" {
 			// 컴투스
-			stockId = append(stockId, "078340")
+			stockIdList = append(stockIdList, "078340")
 		} else if words[0] == "/N" {
 			// 엔씨소프트
-			stockId = append(stockId, "036570")
+			stockIdList = append(stockIdList, "036570")
 			// 넷마블
-			stockId = append(stockId, "251270")
+			stockIdList = append(stockIdList, "251270")
 			// 네오위즈
-			stockId = append(stockId, "095660")
+			stockIdList = append(stockIdList, "095660")
 		} else if words[0] == "/s" && len(words) > 1 {
 			// 종목 직접 지정 ('/s 259960')
-			stockId = append(stockId, words[1])
+			stockIdList = append(stockIdList, words[1])
 		} else if words[0] == "/kospi" {
 			// 코스피
-			stockId = append(stockId, "kospi")
+			stockIdList = append(stockIdList, "kospi")
 		} else if words[0] == "/spy" {
 			// SPDR S&P 500 ETF Trust
-			stockId = append(stockId, "SPY")
+			stockIdList = append(stockIdList, "SPY")
 		} else if words[0] == "/qqq" {
 			// Invesco QQQ Trust
-			stockId = append(stockId, "QQQ")
+			stockIdList = append(stockIdList, "QQQ")
 		} else if words[0] == "/botz" {
 			// Invesco QQQ Trust
-			stockId = append(stockId, "BOTZ")
+			stockIdList = append(stockIdList, "BOTZ")
 		}
 
-		if len(stockId) > 0 {
+		if len(stockIdList) > 0 {
 
 			var textAppended string
-			for _, sId := range stockId {
+			for _, stockId := range stockIdList {
 
-				text, err := getStockPriceTextFromYahoo(sId)
+				text, err := getStockPriceTextFromYahoo(stockId)
 				//msg.ReplyToMessageID = update.Message.MessageID
 				if err != nil {
 					text = "오류"
@@ -372,7 +371,7 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 				textAppended = textAppended + text + "\n"
 			}
 
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, textAppended)
+			msg := newMessage(update.Message.Chat.ID, textAppended)
 			_, _ = bot.Send(msg)
 
 			return
@@ -409,9 +408,21 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 			}
 		}
 
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "오류")
+		msg := newMessage(update.Message.Chat.ID, "오류")
 		//msg.ReplyToMessageID = update.Message.MessageID
 		_, _ = bot.Send(msg)
+	}
+}
+
+func newMessage(chatId int64, text string) tgbotapi.MessageConfig {
+	return tgbotapi.MessageConfig{
+		BaseChat: tgbotapi.BaseChat{
+			ChatID:           chatId,
+			ReplyToMessageID: 0,
+		},
+		Text:                  text,
+		ParseMode:             "MarkdownV2",
+		DisableWebPagePreview: false,
 	}
 }
 
@@ -527,7 +538,7 @@ func getStockPriceTextFromYahoo(stockId string) (string, error) {
 		basic := Basic{
 			StockName:                   result.Meta.Symbol,
 			ClosePrice:                  fmt.Sprintf("%.2f", result.Meta.RegularMarketPrice),
-			CompareToPreviousClosePrice: fmt.Sprintf("%.2f", result.Meta.RegularMarketPrice - result.Meta.ChartPreviousClose),
+			CompareToPreviousClosePrice: fmt.Sprintf("%.2f", result.Meta.RegularMarketPrice-result.Meta.ChartPreviousClose),
 		}
 
 		return getStockItemText(basic, frac), nil
