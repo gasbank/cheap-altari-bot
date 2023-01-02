@@ -172,9 +172,10 @@ func getStockItemText(s StockItem, frac bool) string {
 		markdownText = p.Sprintf("*%s*\n현재가: %.2f\n전일비: %s%.2f (%.2f%%)", s.Name(), closePrice, percentIcon, compareToPreviousClosePrice, percent)
 	}
 
-	markdownText = strings.ReplaceAll(markdownText, "(", "\\(")
-	markdownText = strings.ReplaceAll(markdownText, ")", "\\)")
-	markdownText = strings.ReplaceAll(markdownText, ".", "\\.")
+	escapeList := []rune{'_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'}
+	for _, e := range escapeList {
+		markdownText = strings.ReplaceAll(markdownText, string(e), "\\" + string(e))
+	}
 
 	return markdownText
 }
