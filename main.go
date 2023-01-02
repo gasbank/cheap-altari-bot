@@ -165,19 +165,31 @@ func getStockItemText(s StockItem, frac bool) string {
 	}
 
 	p := message.NewPrinter(language.English)
-	var markdownText string
+
+	nameText := s.Name()
+	var closePriceText string
+	var deltaText string
+
 	if frac == false {
-		markdownText = p.Sprintf("*%s*\n현재가: %.0f\n전일비: %s%.0f (%.2f%%)", s.Name(), closePrice, percentIcon, compareToPreviousClosePrice, percent)
+		closePriceText = p.Sprintf("현재가: %.0f", closePrice)
+		deltaText = p.Sprintf("전일비: %s%.0f (%.2f%%)", percentIcon, compareToPreviousClosePrice, percent)
 	} else {
-		markdownText = p.Sprintf("*%s*\n현재가: %.2f\n전일비: %s%.2f (%.2f%%)", s.Name(), closePrice, percentIcon, compareToPreviousClosePrice, percent)
+		closePriceText = p.Sprintf("현재가: %.2f", closePrice)
+		deltaText = p.Sprintf("전일비: %s%.2f (%.2f%%)", percentIcon, compareToPreviousClosePrice, percent)
 	}
 
-	escapeList := []rune{'_', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'}
+	return p.Sprintf("*%s*\n%s\n%s",
+		escapeMarkdownText(nameText),
+		escapeMarkdownText(closePriceText),
+		escapeMarkdownText(deltaText))
+}
+
+func escapeMarkdownText(t string) string {
+	escapeList := []rune{'_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'}
 	for _, e := range escapeList {
-		markdownText = strings.ReplaceAll(markdownText, string(e), "\\" + string(e))
+		t = strings.ReplaceAll(t, string(e), "\\" + string(e))
 	}
-
-	return markdownText
+	return t
 }
 
 var shutdownCh chan string
