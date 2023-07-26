@@ -375,6 +375,12 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 		} else if words[0] == "/botz" {
 			// Invesco QQQ Trust
 			stockIdList = append(stockIdList, "BOTZ")
+		} else if words[0] == "/qsi" {
+			// Invesco QQQ Trust
+			stockIdList = append(stockIdList, "QSI")
+		} else if words[0] == "/pump" {
+			// Invesco QQQ Trust
+			stockIdList = append(stockIdList, "PUMP")
 		}
 
 		if len(stockIdList) > 0 {
@@ -521,6 +527,12 @@ func getStockPriceTextFromYahoo(stockId string) (string, error) {
 		frac = true
 	} else if stockId == "BOTZ" {
 		getUrl = "https://query1.finance.yahoo.com/v8/finance/chart/BOTZ?interval=3mo"
+		frac = true
+	} else if stockId == "QSI" {
+		getUrl = "https://query1.finance.yahoo.com/v8/finance/chart/QSI?interval=3mo"
+		frac = true
+	} else if stockId == "PUMP" {
+		getUrl = "https://query1.finance.yahoo.com/v8/finance/chart/PUMP?interval=3mo"
 		frac = true
 	} else {
 		// 나머지는 다 네이버 파이낸셜로...
