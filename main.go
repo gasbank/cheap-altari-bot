@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/net/html"
-	"golang.org/x/net/html/atom"
 	"golang.org/x/text/message"
 	"io"
 	"io/ioutil"
@@ -18,15 +16,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-redis/redis/v8"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/go-github/v38/github"
 	"github.com/joho/godotenv"
 	"golang.org/x/text/language"
 )
-
-var rdbContext = context.Background()
-var rdb *redis.Client
 
 type YahooFinanceJson struct {
 	Chart YahooFinanceChart `json:"chart"`
@@ -170,7 +164,7 @@ func getStockItemText(s StockItem, frac bool) string {
 	var closePriceText string
 	var deltaText string
 
-	if frac == false {
+	if !frac {
 		closePriceText = p.Sprintf("현재가: %.0f", closePrice)
 		deltaText = p.Sprintf("전일비: %s%.0f (%.2f%%)", percentIcon, compareToPreviousClosePrice, percent)
 	} else {
@@ -204,7 +198,7 @@ func startGitHubPushListener() {
 
 	if os.Getenv("CHEAP_ALTARI_BOT_SERVER_DEV") == "1" {
 		addr := ":21092"
-		log.Println(fmt.Sprintf("개발 서버네요!!! HTTP addr=%s", addr))
+		log.Printf("개발 서버네요!!! HTTP addr=%s", addr)
 		server = &http.Server{Addr: addr, Handler: m}
 
 		go func() {
@@ -214,7 +208,7 @@ func startGitHubPushListener() {
 		}()
 	} else {
 		addr := ":21093"
-		log.Println(fmt.Sprintf("실서비스 서버네요!!! HTTPS addr=%s", addr))
+		log.Printf("실서비스 서버네요!!! HTTPS addr=%s", addr)
 		server = &http.Server{Addr: addr, Handler: m}
 
 		go func() {
@@ -226,11 +220,9 @@ func startGitHubPushListener() {
 		}()
 	}
 
-	select {
-	case shutdownMsg := <-shutdownCh:
-		_ = server.Shutdown(context.Background())
-		log.Printf("Shutdown message: %s", shutdownMsg)
-	}
+	shutdownMsg := <-shutdownCh
+	_ = server.Shutdown(context.Background())
+	log.Printf("Shutdown message: %s", shutdownMsg)
 
 	log.Println("Gracefully shutdown")
 	os.Exit(0)
@@ -264,39 +256,10 @@ func main() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
-	rdb = redis.NewClient(&redis.Options{
-		Addr:     "",
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-
-	//subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
-
 	updates := bot.GetUpdatesChan(u)
 	for update := range updates {
 		handleUpdate(bot, update)
 	}
-	/*
-
-		subscriber := rdb.Subscribe(rdbContext, "cheap-altari-bot")
-		for {
-			msg, err := subscriber.ReceiveMessage(rdbContext)
-			if err != nil {
-				log.Print(err)
-				continue
-			}
-
-			var update tgbotapi.Update
-			if err := json.Unmarshal([]byte(msg.Payload), &update); err != nil {
-				log.Print(err)
-				log.Printf("Provided JSON:%v", msg.Payload)
-				continue
-			}
-
-			handleUpdate(bot, update)
-			log.Println("Good")
-		}
-	*/
 }
 
 func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
@@ -361,7 +324,7 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 			// 네오위즈
 			stockIdList = append(stockIdList, "095660")
 		} else if words[0] == "/s" && len(words) > 1 {
-			// 종목 직접 지정 ('/s 259960')
+			// 종목 직접 지정 ('/s 259960', '/s qsi' 등)
 			stockIdList = append(stockIdList, words[1])
 		} else if words[0] == "/kospi" {
 			// 코스피
@@ -373,13 +336,10 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 			// Invesco QQQ Trust
 			stockIdList = append(stockIdList, "QQQ")
 		} else if words[0] == "/botz" {
-			// Invesco QQQ Trust
 			stockIdList = append(stockIdList, "BOTZ")
 		} else if words[0] == "/qsi" {
-			// Invesco QQQ Trust
 			stockIdList = append(stockIdList, "QSI")
 		} else if words[0] == "/pump" {
-			// Invesco QQQ Trust
 			stockIdList = append(stockIdList, "PUMP")
 		}
 
@@ -411,8 +371,6 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 			imageId = "parggul.jpg"
 		} else if words[0] == "/salggul" {
 			imageId = "salggul.png"
-		} else if words[0] == "/racoon" {
-			imageId = "racoon.jpg"
 		} else if words[0] == "/racoon" {
 			imageId = "racoon.jpg"
 		}
@@ -494,45 +452,13 @@ func getStockPriceText(stockId string) (string, error) {
 	return getStockItemText(stockItem, frac), nil
 }
 
-func findTextDataBySpanIdAnchors(node *html.Node, spanId string) string {
-	for c := node.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.ElementNode {
-			if c.DataAtom == atom.Span {
-				for _, v := range c.Attr {
-					if v.Key == "id" && v.Val == spanId {
-						for cc := c.FirstChild; cc != nil; cc = cc.NextSibling {
-							if cc.Type == html.TextNode {
-								return cc.Data
-							}
-						}
-					}
-				}
-			}
-		}
-
-		childRet := findTextDataBySpanIdAnchors(c, spanId)
-		if childRet != "" {
-			return childRet
-		}
-	}
-
-	return ""
-}
-
 func getStockPriceTextFromYahoo(stockId string) (string, error) {
 	var getUrl string
 	var frac bool
-	if stockId == "QQQ" {
-		getUrl = "https://query1.finance.yahoo.com/v8/finance/chart/QQQ?interval=3mo"
-		frac = true
-	} else if stockId == "BOTZ" {
-		getUrl = "https://query1.finance.yahoo.com/v8/finance/chart/BOTZ?interval=3mo"
-		frac = true
-	} else if stockId == "QSI" {
-		getUrl = "https://query1.finance.yahoo.com/v8/finance/chart/QSI?interval=3mo"
-		frac = true
-	} else if stockId == "PUMP" {
-		getUrl = "https://query1.finance.yahoo.com/v8/finance/chart/PUMP?interval=3mo"
+	if stockId == "kospi" {
+		return getStockPriceText(stockId)
+	} else if len(stockId) > 0 && ((stockId[0] >= 'a' && stockId[0] <= 'z') || (stockId[0] >= 'A' && stockId[0] <= 'Z')) {
+		getUrl = fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=3mo", strings.ToUpper(stockId))
 		frac = true
 	} else {
 		// 나머지는 다 네이버 파이낸셜로...
@@ -571,66 +497,6 @@ func getStockPriceTextFromYahoo(stockId string) (string, error) {
 			StockName:                   result.Meta.Symbol,
 			ClosePrice:                  fmt.Sprintf("%.2f", result.Meta.RegularMarketPrice),
 			CompareToPreviousClosePrice: fmt.Sprintf("%.2f", result.Meta.RegularMarketPrice-result.Meta.ChartPreviousClose),
-		}
-
-		return getStockItemText(basic, frac), nil
-	} else {
-		return "", err
-	}
-
-	return "", nil
-}
-
-// 며칠 쓰니까 무슨 방식인지 보안 절차가 추가되었다.
-// URL 바뀌는 방식으로 보이므로... 쓰지 않도록
-func getStockPriceTextFromInvesting(stockId string) (string, error) {
-	var getUrl string
-	var frac bool
-	var referer string
-	if stockId == "QQQ" {
-		getUrl = "https://jp.investing.com/common/modules/js_instrument_chart/api/data.php?pair_id=651&pair_id_for_news=651&chart_type=area&pair_interval=86400&candle_count=120&events=yes&volume_series=yes"
-		referer = "https://jp.investing.com/etfs/powershares-qqqq"
-		frac = true
-	} else if stockId == "BOTZ" {
-		getUrl = "https://jp.investing.com/common/modules/js_instrument_chart/api/data.php?pair_id=995739&pair_id_for_news=995739&chart_type=area&pair_interval=86400&candle_count=120&events=yes&volume_series=yes"
-		referer = "https://jp.investing.com/etfs/global-x-robotics---ai-usd"
-		frac = true
-	} else {
-		// 나머지는 다 네이버 파이낸셜로...
-		return getStockPriceText(stockId)
-	}
-
-	req, _ := http.NewRequest("GET", getUrl, nil)
-	req.Header.Set("referer", referer)
-	req.Header.Set("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36")
-	req.Header.Set("x-requested-with", "XMLHttpRequest")
-
-	client := new(http.Client)
-	resp, err := client.Do(req)
-
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	// 결과 출력
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%s\n", string(data))
-
-	var investingJson InvestingJson
-	if err := json.Unmarshal(data, &investingJson); err == nil {
-		node, err := html.Parse(strings.NewReader(investingJson.Html.ChartInfo))
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		basic := Basic{
-			StockName:                   findTextDataBySpanIdAnchors(node, "chart-info-symbol"),
-			ClosePrice:                  findTextDataBySpanIdAnchors(node, "chart-info-last"),
-			CompareToPreviousClosePrice: findTextDataBySpanIdAnchors(node, "chart-info-change"),
 		}
 
 		return getStockItemText(basic, frac), nil
