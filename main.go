@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"golang.org/x/text/message"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -65,6 +64,26 @@ type HomeMajor struct {
 	ClosePrice                  string `json:"closePrice"`
 	CompareToPreviousClosePrice string `json:"CompareToPreviousClosePrice"`
 	FluctuationRatio            string `json:"fluctuationRatio"`
+}
+
+// 한국투자증권
+type KisResult struct {
+	Output struct {
+		Rsym string `json:"rsym"`
+		Zdiv string `json:"zdiv"`
+		Base string `json:"base"`
+		Pvol string `json:"pvol"`
+		Last string `json:"last"`
+		Sign string `json:"sign"`
+		Diff string `json:"diff"`
+		Rate string `json:"rate"`
+		Tvol string `json:"tvol"`
+		Tamt string `json:"tamt"`
+		Ordy string `json:"ordy"`
+	} `json:"output"`
+	RtCd  string `json:"rt_cd"`
+	MsgCd string `json:"msg_cd"`
+	Msg1  string `json:"msg1"`
 }
 
 type StockItem interface {
@@ -181,7 +200,7 @@ func getStockItemText(s StockItem, frac bool) string {
 func escapeMarkdownText(t string) string {
 	escapeList := []rune{'_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'}
 	for _, e := range escapeList {
-		t = strings.ReplaceAll(t, string(e), "\\" + string(e))
+		t = strings.ReplaceAll(t, string(e), "\\"+string(e))
 	}
 	return t
 }
@@ -348,10 +367,15 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 			var textAppended string
 			for _, stockId := range stockIdList {
 
-				text, err := getStockPriceTextFromYahoo(stockId)
-				//msg.ReplyToMessageID = update.Message.MessageID
+				text, err := getStockPriceTextFromYahoo(stockId) // 1차 시도
 				if err != nil {
-					text = "오류"
+					text, err = getStockPriceTextFromKIS("AMS", stockId) // 2차 시도
+					if err != nil {
+						text, err = getStockPriceTextFromKIS("NAS", stockId) // 3차 시도
+						if err != nil {
+							text = "오류"
+						}
+					}
 				}
 
 				textAppended = textAppended + text + "\n"
@@ -376,7 +400,7 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 		}
 
 		if imageId != "" {
-			ibytes, err := ioutil.ReadFile(filepath.Join("./images", imageId))
+			ibytes, err := os.ReadFile(filepath.Join("./images", imageId))
 
 			if err == nil {
 
@@ -386,7 +410,7 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 				}
 
 				photo := tgbotapi.NewPhoto(update.Message.Chat.ID, file)
-				bot.Send(photo)
+				_, _ = bot.Send(photo)
 
 				return
 			}
@@ -429,10 +453,12 @@ func getStockPriceText(stockId string) (string, error) {
 	if err != nil {
 		panic(err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	// 결과 출력
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
@@ -450,6 +476,60 @@ func getStockPriceText(stockId string) (string, error) {
 	}
 
 	return getStockItemText(stockItem, frac), nil
+}
+
+func getStockPriceTextFromKIS(exchangeId, stockId string) (string, error) {
+	var getUrl string
+	var frac bool
+	if len(stockId) > 0 && ((stockId[0] >= 'a' && stockId[0] <= 'z') || (stockId[0] >= 'A' && stockId[0] <= 'Z')) {
+		getUrl = fmt.Sprintf("http://localhost:26704/query?excd=%s&symb=%s", exchangeId, strings.ToUpper(stockId))
+		frac = true
+	} else {
+		// 나머지는 다 네이버 파이낸셜로...
+		return getStockPriceText(stockId)
+	}
+
+	req, _ := http.NewRequest("GET", getUrl, nil)
+
+	client := new(http.Client)
+	resp, err := client.Do(req)
+
+	if err != nil {
+		panic(err)
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	// 결과 출력
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%s\n", string(data))
+
+	var kisResult KisResult
+	if err := json.Unmarshal(data, &kisResult); err == nil {
+
+		if len(kisResult.Output.Last) == 0 {
+			return "", errors.New("empty array")
+		}
+
+		base, _ := strconv.ParseFloat(kisResult.Output.Base, 64)
+		last, _ := strconv.ParseFloat(kisResult.Output.Last, 64)
+
+		basic := Basic{
+			StockName:                   kisResult.Output.Rsym[4:],
+			ClosePrice:                  fmt.Sprintf("%.2f", last),
+			CompareToPreviousClosePrice: fmt.Sprintf("%.2f", last-base),
+		}
+
+		return getStockItemText(basic, frac), nil
+	} else {
+		return "", err
+	}
+
+	return "", nil
 }
 
 func getStockPriceTextFromYahoo(stockId string) (string, error) {
@@ -478,7 +558,7 @@ func getStockPriceTextFromYahoo(stockId string) (string, error) {
 	}(resp.Body)
 
 	// 결과 출력
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
