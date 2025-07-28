@@ -373,7 +373,10 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 					if err != nil {
 						text, err = getStockPriceTextFromKIS("NAS", stockId) // 3차 시도
 						if err != nil {
-							text = "오류"
+							text, err = getStockPriceTextFromKIS("NYS", stockId) // 3차 시도
+							if err != nil {
+								text = "오류"
+							}
 						}
 					}
 				}
