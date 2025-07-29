@@ -281,6 +281,8 @@ func main() {
 	}
 }
 
+var stockIdSourceMap = make(map[string]StockPriceSource)
+
 func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	if update.Message != nil && update.Message.ReplyToMessage == nil { // If we got a message
 		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
@@ -367,17 +369,31 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 			var textAppended string
 			for _, stockId := range stockIdList {
 
-				text, err := getStockPriceTextFromYahoo(stockId) // 1차 시도
-				if err != nil {
-					text, err = getStockPriceTextFromKIS("AMS", stockId) // 2차 시도
+				var text string
+				var err = errors.New("errors not set (undefined)")
+
+				// 마지막으로 조회 성공한 거래소가 있었다면 거기에서 바로 조회하면 된다.
+				if source, ok := stockIdSourceMap[stockId]; ok {
+					text, err = getStockPriceTextBySpecificSource(source, stockId)
 					if err != nil {
-						text, err = getStockPriceTextFromKIS("NAS", stockId) // 3차 시도
-						if err != nil {
-							text, err = getStockPriceTextFromKIS("NYS", stockId) // 3차 시도
-							if err != nil {
-								text = "오류"
-							}
-						}
+						log.Println("getStockPriceTextBySpecificSource() failed with error: " + err.Error())
+						// 실패했다. 캐시된 거 지운다.
+						delete(stockIdSourceMap, stockId)
+					}
+				}
+
+				// 마지막으로 성공했어도 지금은 실패했을 수도 있다. 그땐 그냥 다 조회한다.
+				if err != nil {
+					var newSource StockPriceSource
+					newSource, text, err = getStockPriceTextByTrialAndError(stockId)
+
+					// 여전히 오류다
+					if err != nil {
+						log.Println("getStockPriceTextByTrialAndError() failed with error: " + err.Error())
+						text = "오류"
+					} else {
+						// 성공했으므로 캐시에 기록한다.
+						stockIdSourceMap[stockId] = newSource
 					}
 				}
 
@@ -423,6 +439,52 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 		//msg.ReplyToMessageID = update.Message.MessageID
 		_, _ = bot.Send(msg)
 	}
+}
+
+type StockPriceSource int
+
+const (
+	SourceInvalid StockPriceSource = iota
+	SourceYahoo
+	SourceKISAMS
+	SourceKISNAS
+	SourceKISNYS
+)
+
+func getStockPriceTextBySpecificSource(source StockPriceSource, stockId string) (string, error) {
+	switch source {
+	case SourceYahoo:
+		return getStockPriceTextFromYahoo(stockId)
+	case SourceKISAMS:
+		return getStockPriceTextFromKIS("AMS", stockId)
+	case SourceKISNAS:
+		return getStockPriceTextFromKIS("NAS", stockId)
+	case SourceKISNYS:
+		return getStockPriceTextFromKIS("NYS", stockId)
+	default:
+		return "오류", errors.New("unknown source: " + string(source))
+	}
+}
+
+func getStockPriceTextByTrialAndError(stockId string) (StockPriceSource, string, error) {
+	if text, err := getStockPriceTextBySpecificSource(SourceKISAMS, stockId); err == nil {
+		return SourceKISAMS, text, nil
+	}
+
+	if text, err := getStockPriceTextBySpecificSource(SourceKISNAS, stockId); err == nil {
+		return SourceKISNAS, text, nil
+	}
+
+	if text, err := getStockPriceTextBySpecificSource(SourceKISNYS, stockId); err == nil {
+		return SourceKISNYS, text, nil
+	}
+
+	if text, err := getStockPriceTextBySpecificSource(SourceYahoo, stockId); err == nil {
+		return SourceYahoo, text, nil
+	}
+
+	// 아 망했어요
+	return SourceInvalid, "오류", errors.New("cannot get price text from all sources: " + stockId)
 }
 
 func newMessage(chatId int64, text string) tgbotapi.MessageConfig {
